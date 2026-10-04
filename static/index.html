@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinePrint - Know what you're signing.</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="logo">FinePrint</div>
+        <div class="theme-toggle">
+            <button id="theme-btn">Toggle Theme</button>
+        </div>
+    </header>
+
+    <main id="app-content">
+        <!-- Landing View -->
+        <section id="landing-view" class="view active">
+            <h1>Know what you're signing.</h1>
+            <p class="subtitle">A team of cooperating AI agents reads your agreement, finds hidden clauses, challenges its own findings, and explains what to ask for instead.</p>
+            
+            <div class="upload-card">
+                <form id="upload-form">
+                    <div class="tabs">
+                        <button type="button" class="tab active" data-target="file-upload">Upload File</button>
+                        <button type="button" class="tab" data-target="text-paste">Paste Text</button>
+                    </div>
+                    
+                    <div id="file-upload" class="tab-content active">
+                        <div class="drop-zone" id="drop-zone">
+                            <p>Drag and drop a PDF or TXT file here, or click to browse.</p>
+                            <input type="file" id="file-input" accept=".pdf,.txt" hidden>
+                        </div>
+                    </div>
+                    
+                    <div id="text-paste" class="tab-content">
+                        <textarea id="text-input" placeholder="Paste your agreement text here..."></textarea>
+                    </div>
+
+                    <div class="lang-select">
+                        <label for="language">Explain in:</label>
+                        <select id="language" name="language">
+                            <option value="en">English</option>
+                            <option value="hi">Hindi</option>
+                            <option value="mr">Marathi</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn primary">Analyze Agreement</button>
+                </form>
+            </div>
+
+            <div class="samples">
+                <p>Or try a sample contract:</p>
+                <button class="btn secondary" data-sample="employment_nimbus.txt">Employment Agreement</button>
+                <button class="btn secondary" data-sample="rental_agreement.txt">Rental Agreement</button>
+            </div>
+
+            <div class="trust-points">
+                <div class="point">
+                    <div class="icon">👥</div>
+                    <p>A team of specialists reads every clause</p>
+                </div>
+                <div class="point">
+                    <div class="icon">🔍</div>
+                    <p>Every finding quotes your document</p>
+                </div>
+                <div class="point">
+                    <div class="icon">⚖️</div>
+                    <p>Findings are challenged before you see them</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Live Agent View -->
+        <section id="live-view" class="view">
+            <h2>Analyzing your agreement...</h2>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="overall-progress"></div>
+            </div>
+            
+            <div class="agent-grid" id="agent-grid">
+                <!-- Agent cards will be injected here -->
+            </div>
+
+            <div class="live-feed" id="live-feed">
+                <h3>Live Feed</h3>
+                <ul id="feed-list"></ul>
+            </div>
+        </section>
+
+        <!-- Results View -->
+        <section id="results-view" class="view">
+            <div class="results-header">
+                <div class="risk-gauge" id="risk-gauge">
+                    <span id="risk-score">0</span>
+                    <span id="risk-label">Analyzing...</span>
+                </div>
+                <div class="executive-summary" id="executive-summary"></div>
+                <div class="severity-filters">
+                    <button class="chip high active" data-filter="high">High (<span id="count-high">0</span>)</button>
+                    <button class="chip medium active" data-filter="medium">Medium (<span id="count-medium">0</span>)</button>
+                    <button class="chip low active" data-filter="low">Low (<span id="count-low">0</span>)</button>
+                </div>
+            </div>
+
+            <div class="two-pane">
+                <div class="left-pane document-view" id="document-view">
+                    <!-- Document text with highlights injected here -->
+                </div>
+                <div class="right-pane findings-view">
+                    <div id="findings-list"></div>
+                    
+                    <div class="questions-card" id="questions-card">
+                        <h4>Questions to ask before you sign</h4>
+                        <ul id="questions-list"></ul>
+                    </div>
+
+                    <div class="rejected-findings">
+                        <details>
+                            <summary>Findings the Skeptic rejected (<span id="count-rejected">0</span>)</summary>
+                            <ul id="rejected-list"></ul>
+                        </details>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-bar">
+                <button class="btn secondary" id="btn-export">Export Report</button>
+                <button class="btn secondary" id="btn-copy-all">Copy All Counter-Clauses</button>
+                <button class="btn primary" id="btn-analyze-another">Analyze Another</button>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>FinePrint is decision support, not legal advice. AI can make mistakes; verify important points with a qualified lawyer.</p>
+    </footer>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="/app.js" type="module"></script>
+</body>
+</html>
