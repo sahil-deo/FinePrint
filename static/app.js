@@ -1,314 +1,364 @@
-// State
+const $ = id => document.getElementById(id);
+
 let currentJobId = null;
 let currentReport = null;
-let activeFilters = new Set(['high', 'medium', 'low']);
+let findingsData = {};
+let selectedFindingId = null;
 
-// Elements
-const views = {
-    landing: document.getElementById('landing-view'),
-    live: document.getElementById('live-view'),
-    results: document.getElementById('results-view')
-};
-
-// Theme toggle
-const themeBtn = document.getElementById('theme-btn');
+// Thematic setup
+const themeBtn = $('theme-btn');
 themeBtn.addEventListener('click', () => {
-    const isDark = document.body.getAttribute('data-theme') === 'dark';
-    document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
 });
 if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.setAttribute('data-theme', 'dark');
+    document.documentElement.setAttribute('data-theme', 'dark');
 }
 
-function showView(viewName) {
-    Object.values(views).forEach(v => v.classList.remove('active'));
-    views[viewName].classList.add('active');
+// Phases
+function switchPhase(phaseId) {
+    document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+    $(phaseId).classList.add('active');
 }
 
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-}
-
-// Tabs
-document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', (e) => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        e.target.classList.add('active');
-        document.getElementById(e.target.dataset.target).classList.add('active');
-    });
-});
-
-// File input click
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('file-input');
-dropZone.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-        dropZone.querySelector('p').textContent = e.target.files[0].name;
-    }
-});
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--primary-color)'; });
-dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = 'var(--border-color)');
-dropZone.addEventListener('drop', e => {
+// Phase 1 Form
+$('upload-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    dropZone.style.borderColor = 'var(--border-color)';
-    if (e.dataTransfer.files.length) {
-        fileInput.files = e.dataTransfer.files;
-        dropZone.querySelector('p').textContent = fileInput.files[0].name;
-    }
-});
-
-// Start Analysis
-document.getElementById('upload-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const fd = new FormData();
-    fd.append('language', document.getElementById('language').value);
+    const text = $('text-input').value;
+    const file = $('file-input').files[0];
+    const lang = document.querySelector('input[name="language"]:checked').value;
     
-    if (document.getElementById('file-upload').classList.contains('active')) {
-        if (!fileInput.files[0]) { showToast('Please select a file'); return; }
-        fd.append('file', fileInput.files[0]);
-    } else {
-        const text = document.getElementById('text-input').value.trim();
-        if (!text) { showToast('Please enter text'); return; }
-        fd.append('text', text);
-    }
+    if (!text && !file) return showToast("Provide text or a file");
     
-    await startJob(fd);
-});
-
-document.querySelectorAll('[data-sample]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-        const sampleName = e.target.dataset.sample;
-        const res = await fetch(`/sample/${sampleName}`);
-        const data = await res.json();
-        const fd = new FormData();
-        fd.append('text', data.text);
-        fd.append('language', 'en');
-        // Hack: We append the filename to let the backend know it's a sample if needed for demo cache
-        fd.append('file', new File([data.text], sampleName, {type: 'text/plain'}));
-        await startJob(fd);
-    });
-});
-
-async function startJob(formData) {
-    showView('live');
-    document.getElementById('agent-grid').innerHTML = '';
-    document.getElementById('feed-list').innerHTML = '';
+    const formData = new FormData();
+    formData.append('text', text);
+    formData.append('language', lang);
+    if (file) formData.append('file', file);
+    
+    const btn = $('btn-analyze');
+    btn.textContent = "Connecting...";
+    btn.disabled = true;
     
     try {
         const res = await fetch('/analyze', { method: 'POST', body: formData });
+        if (!res.ok) throw new Error("Failed to start analysis");
         const data = await res.json();
         currentJobId = data.job_id;
-        connectSSE(currentJobId);
-    } catch (e) {
-        showToast('Failed to start analysis.');
-        showView('landing');
+        
+        switchPhase('phase-analysis');
+        initGraph();
+        startSSE(currentJobId);
+        
+        // Render raw text initially
+        if (text) renderDocument(text);
+        
+    } catch (err) {
+        showToast(err.message);
+        btn.textContent = "Analyze";
+        btn.disabled = false;
     }
-}
+});
 
-const agentCards = {};
-const AGENTS = ["Segmenter", "Profiler", "Readers", "Money Hunter", "Exit Hunter", "Control Hunter", "Rights Hunter", "Gaps Hunter", "Cross-Clause Analyst", "Grounding", "Skeptic", "Advisor"];
-
-function updateAgentCard(agent, status, message) {
-    if (!agentCards[agent]) {
-        const div = document.createElement('div');
-        div.className = 'agent-card';
-        div.innerHTML = `
-            <div class="status-icon">⏳</div>
-            <h4>${agent}</h4>
-            <p class="agent-msg text-muted" style="font-size:0.8rem"></p>
-        `;
-        document.getElementById('agent-grid').appendChild(div);
-        agentCards[agent] = div;
+// Drag and drop overlay
+const dropZone = $('drop-zone');
+document.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+document.addEventListener('dragleave', e => { if(e.target === dropZone) dropZone.classList.remove('dragover'); });
+document.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+        $('file-input').files = e.dataTransfer.files;
+        showToast(`Loaded ${file.name}`);
+        // auto trigger if ready
     }
-    const card = agentCards[agent];
-    card.querySelector('.agent-msg').textContent = message || '';
+});
+$('file-input').addEventListener('change', e => {
+    if (e.target.files[0]) showToast(`Loaded ${e.target.files[0].name}`);
+});
+
+// Graph rendering
+const graphNodes = [
+    { id: 'Segmenter', x: 80, y: 100, type: 'code', label: 'Segmenter' },
+    { id: 'Readers', x: 220, y: 100, type: 'ai', label: 'FullReader' },
+    { id: 'Profiler', x: 220, y: 160, type: 'ai', label: 'Profiler' }, // Fake profiler node
+    { id: 'Hunters', x: 420, y: 100, type: 'ai', label: 'Risk Hunters' },
+    { id: 'Grounding', x: 620, y: 100, type: 'code', label: 'Grounding' },
+    { id: 'Skeptic', x: 760, y: 100, type: 'ai', label: 'Skeptic' },
+    { id: 'Advisor', x: 900, y: 100, type: 'ai', label: 'Advisor' }
+];
+
+const edges = [
+    { from: 'Segmenter', to: 'Readers' },
+    { from: 'Readers', to: 'Hunters' },
+    { from: 'Hunters', to: 'Grounding' },
+    { from: 'Grounding', to: 'Skeptic' },
+    { from: 'Skeptic', to: 'Advisor' }
+];
+
+function initGraph() {
+    const svg = $('agent-graph');
+    svg.setAttribute('viewBox', '0 0 1000 200');
+    let html = '';
     
-    card.classList.remove('working');
-    if (status === 'working') {
-        card.classList.add('working');
-        card.querySelector('.status-icon').textContent = '⚙️';
-    } else if (status === 'done') {
-        card.querySelector('.status-icon').textContent = '✅';
+    // Draw edges
+    edges.forEach(e => {
+        const from = graphNodes.find(n => n.id === e.from);
+        const to = graphNodes.find(n => n.id === e.to);
+        const path = `M ${from.x} ${from.y} C ${(from.x + to.x)/2} ${from.y}, ${(from.x + to.x)/2} ${to.y}, ${to.x} ${to.y}`;
+        html += `<g class="edge" id="edge-${from.id}-${to.id}"><path d="${path}" /></g>`;
+    });
+    
+    // Draw nodes
+    graphNodes.forEach(n => {
+        html += `<g class="node" id="node-${n.id}" transform="translate(${n.x}, ${n.y})">`;
+        if (n.type === 'ai') {
+            html += `<circle cx="0" cy="0" r="16" />`;
+        } else {
+            html += `<rect x="-14" y="-14" width="28" height="28" rx="4" />`;
+        }
+        html += `<text class="label" y="32">${n.label}</text>`;
+        html += `<text class="count" id="count-${n.id}" y="4">0</text>`;
+        html += `</g>`;
+    });
+    
+    svg.innerHTML = html;
+}
+
+function updateNode(agentName, status) {
+    // Map backend agent names to our graph
+    let nodeId = agentName;
+    if (agentName.includes("Hunter") || agentName === "Cross-Clause Analyst" || agentName === "FullRiskAnalyst" || agentName === "Money Hunter") {
+        nodeId = 'Hunters';
+    }
+    const g = $(`node-${nodeId}`);
+    if (!g) return;
+    
+    g.classList.remove('active', 'done');
+    if (status === 'started' || status === 'progress') g.classList.add('active');
+    if (status === 'finished') g.classList.add('done');
+    
+    // Update edges
+    if (status === 'finished') {
+        edges.filter(e => e.from === nodeId).forEach(e => {
+            const edgeEl = $(`edge-${e.from}-${e.to}`);
+            if (edgeEl) { edgeEl.classList.add('active'); }
+        });
+        edges.filter(e => e.to === nodeId).forEach(e => {
+            const edgeEl = $(`edge-${e.from}-${e.to}`);
+            if (edgeEl) { edgeEl.classList.remove('active'); edgeEl.classList.add('done'); }
+        });
     }
 }
 
-function connectSSE(jobId) {
+// SSE Connection
+function startSSE(jobId) {
     const es = new EventSource(`/stream/${jobId}`);
     
     es.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        const { event, data: payload } = data;
+        const payload = JSON.parse(e.data);
+        const { event, data } = payload;
         
-        const feed = document.getElementById('feed-list');
-        const li = document.createElement('li');
-        
-        if (event === 'agent_started') {
-            updateAgentCard(payload.agent, 'working', 'Starting...');
-        } else if (event === 'agent_progress') {
-            updateAgentCard(payload.agent, 'working', payload.message);
-            li.textContent = `[${payload.agent}] ${payload.message}`;
-            feed.appendChild(li);
-        } else if (event === 'agent_finished') {
-            updateAgentCard(payload.agent, 'done', payload.message);
-        } else if (event === 'finding_discovered') {
-            li.innerHTML = `<strong>New Finding:</strong> ${payload.finding.title} <em>(by ${payload.finding.agent})</em>`;
-            feed.appendChild(li);
-        } else if (event === 'finding_verdict') {
-            li.innerHTML = `<strong>Skeptic Verdict:</strong> Finding ${payload.id} -> ${payload.verdict}`;
-            feed.appendChild(li);
-        } else if (event === 'report_ready') {
+        if (event === 'agent_started' || event === 'agent_progress' || event === 'agent_finished') {
+            updateNode(data.agent, event.split('_')[1]);
+        }
+        else if (event === 'finding_discovered') {
+            const f = data.finding;
+            findingsData[f.title] = { title: f.title, status: 'reviewing', agent: f.agent };
+            addFindingCard(f);
+            
+            // Increment counter on Hunters
+            const cEl = $('count-Hunters');
+            if(cEl) cEl.textContent = parseInt(cEl.textContent) + 1;
+        }
+        else if (event === 'finding_verdict') {
+            const { id, verdict, reason } = data;
+            updateFindingCard(id, verdict, reason);
+        }
+        else if (event === 'report_ready') {
             es.close();
             fetchReport(jobId);
-        } else if (event === 'error') {
-            es.close();
-            showToast('Error during analysis: ' + payload.message);
-            showView('landing');
         }
-        
-        feed.parentElement.scrollTop = feed.parentElement.scrollHeight;
+        else if (event === 'error') {
+            es.close();
+            showToast("Pipeline error: " + data.message);
+        }
     };
-    
-    es.onerror = () => {
-        es.close();
-        // Assume finished if disconnected
-        fetchReport(jobId).catch(() => {});
-    };
+    es.onerror = () => { es.close(); fetchReport(jobId).catch(()=>{}); };
 }
 
 async function fetchReport(jobId) {
     try {
+        $('live-status').textContent = "Finalizing report...";
+        $('live-dot').style.animation = "none";
+        
         const res = await fetch(`/report/${jobId}`);
-        if (!res.ok) throw new Error('Report not found');
+        if (!res.ok) throw new Error("Report not found");
         currentReport = await res.json();
-        renderReport();
-        showView('results');
-    } catch (e) {
-        showToast('Failed to load report.');
+        
+        transitionToReview();
+    } catch(err) {
+        showToast(err.message);
     }
 }
 
-function renderReport() {
-    if (!currentReport) return;
+function transitionToReview() {
+    $('graph-container').classList.add('collapsed');
+    $('review-header').style.display = 'block';
+    $('live-status').textContent = "Analysis complete";
     
-    // Header
-    const scoreVal = currentReport.score.risk_score;
-    document.getElementById('risk-score').textContent = scoreVal;
-    document.getElementById('risk-label').textContent = currentReport.score.verdict_label;
+    // Fill stats
+    const score = currentReport.score;
+    $('score-number').textContent = score.risk_score;
+    $('verdict-sentence').textContent = score.verdict_label + ". " + currentReport.findings.length + " issues found.";
     
-    // Color gauge based on score
-    const gauge = document.getElementById('risk-gauge');
-    if (scoreVal < 25) gauge.style.borderColor = 'var(--severity-low)';
-    else if (scoreVal < 75) gauge.style.borderColor = 'var(--severity-medium)';
-    else gauge.style.borderColor = 'var(--severity-high)';
-    
-    document.getElementById('executive-summary').innerHTML = `<p>${currentReport.executive_summary}</p>`;
-    
-    document.getElementById('count-high').textContent = currentReport.score.counts.high || 0;
-    document.getElementById('count-medium').textContent = currentReport.score.counts.medium || 0;
-    document.getElementById('count-low').textContent = currentReport.score.counts.low || 0;
-    document.getElementById('count-rejected').textContent = currentReport.score.counts.rejected || 0;
-    
-    // Questions
-    const qList = document.getElementById('questions-list');
-    qList.innerHTML = currentReport.questions_to_ask.map(q => `<li>${q}</li>`).join('');
-    
-    // Rejected Findings
-    const rList = document.getElementById('rejected-list');
-    rList.innerHTML = currentReport.rejected_findings.map(f => 
-        `<li><strong>${f.title}</strong><br><span class="text-muted">Reason: ${f.skeptic_reason}</span></li>`
-    ).join('');
-    
-    renderDocumentAndFindings();
+    // Render document highlights
+    if (currentReport.document_text) {
+        renderDocument(currentReport.document_text, currentReport.findings);
+    }
 }
 
-function renderDocumentAndFindings() {
-    // Findings List
-    const fList = document.getElementById('findings-list');
-    fList.innerHTML = '';
+function addFindingCard(f) {
+    // Generate an ID based on title for pre-verdict tracking
+    const tempId = 'fc-' + Math.random().toString(36).substr(2, 9);
+    findingsData[f.title].id = tempId;
     
-    const relevantFindings = currentReport.findings.filter(f => activeFilters.has(f.final_severity));
-    
-    relevantFindings.forEach(f => {
-        const div = document.createElement('div');
-        div.className = `finding-card ${f.final_severity}`;
-        div.id = `finding-${f.id}`;
-        div.innerHTML = `
-            <div><span class="badge ${f.final_severity}">${f.final_severity.toUpperCase()}</span> 
-                 <span class="badge" style="background:#555">Conf: ${(f.final_confidence*100).toFixed(0)}%</span></div>
-            <h4>${f.title}</h4>
-            <p><strong>What it means:</strong> ${f.plain_explanation || f.why_risky_for_user}</p>
-            <details style="margin-top:0.5rem">
-                <summary>Why this matters (Skeptic: ${f.verdict})</summary>
-                <p>${f.why_risky_for_user}</p>
-                <p class="text-muted" style="font-size:0.8rem">Found by: ${f.found_by.join(', ')}</p>
-            </details>
-            ${f.suggested_counter_clause ? `
-                <div style="margin-top:1.5rem; padding:1.25rem; background:var(--bg-color); border: 1px solid var(--border-color); border-radius:8px;">
-                    <strong style="color:var(--primary-color)">Ask for this instead:</strong>
-                    <p style="margin-top:0.5rem; margin-bottom:1rem">${f.what_to_ask_for}</p>
-                    <button class="btn secondary" style="font-size:0.75rem; padding:0.35rem 0.75rem" onclick="navigator.clipboard.writeText('${f.suggested_counter_clause.replace(/'/g, "\\'")}'); showToast('Copied counter-clause!')">Copy Exact Clause</button>
-                    <p style="font-size:0.85rem; margin-top:0.75rem; font-family:monospace; padding:0.75rem; background:rgba(128,128,128,0.05); border-radius:4px; border:1px dashed var(--border-color)">${f.suggested_counter_clause}</p>
-                </div>
-            ` : ''}
-        `;
-        fList.appendChild(div);
-    });
-    
-    // Document View
-    const docView = document.getElementById('document-view');
-    let docHTML = "";
-    
-    // We can map clauses to findings
-    const clauseToSeverity = {};
-    relevantFindings.forEach(f => {
-        f.clause_ids.forEach(cid => {
-            const current = clauseToSeverity[cid];
-            // highest severity wins highlighting
-            if (f.final_severity === 'high') clauseToSeverity[cid] = 'high';
-            else if (f.final_severity === 'medium' && current !== 'high') clauseToSeverity[cid] = 'medium';
-            else if (f.final_severity === 'low' && current !== 'high' && current !== 'medium') clauseToSeverity[cid] = 'low';
-        });
-    });
+    const div = document.createElement('div');
+    div.className = 'finding-card';
+    div.id = tempId;
+    div.innerHTML = `
+        <div class="fc-header">
+            <h4 class="fc-title">${f.title}</h4>
+            <span class="fc-clause-chip">Reviewing...</span>
+        </div>
+        <p class="fc-desc">Found by ${f.agent}</p>
+        <span class="fc-status reviewing">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            Skeptic review
+        </span>
+    `;
+    $('findings-list').prepend(div);
+}
 
-    currentReport.clauses.forEach(c => {
-        const sev = clauseToSeverity[c.clause_id];
-        if (sev) {
-            docHTML += `<div class="clause-highlight highlight-${sev}" id="doc-clause-${c.clause_id}" title="Click to view findings">`;
-        } else {
-            docHTML += `<div>`;
+function updateFindingCard(id, verdict, reason) {
+    // We only have the real ID now, let's find the matching finding in report if available, or just update DOM
+    // The backend sends `finding_verdict` with the `id`. We need to match it.
+    // Wait, `finding_discovered` only sent title and agent. We might not have the ID until `finding_verdict`.
+    // Let's just find a finding card that is 'reviewing' and update it.
+    const cards = document.querySelectorAll('.fc-status.reviewing');
+    if(cards.length > 0) {
+        const card = cards[cards.length-1].closest('.finding-card');
+        card.id = `finding-${id}`;
+        
+        let vClass = 'low'; let vLabel = 'Confirmed'; let icon = '<polyline points="20 6 9 17 4 12"></polyline>';
+        if (verdict === 'rejected') {
+            card.classList.add('rejected');
+            $('rejected-list').appendChild(card);
+            $('rejected-group').style.display = 'block';
+            $('c-rejected').textContent = parseInt($('c-rejected').textContent) + 1;
+            return; // Move to rejected
+        } else if (verdict === 'downgraded') {
+            vClass = 'medium'; vLabel = 'Downgraded';
         }
         
-        docHTML += `<strong>[${c.clause_id}] ${c.heading}</strong>\n${c.text}\n</div>\n`;
-    });
-    
-    docView.innerHTML = docHTML;
+        card.classList.add(vClass);
+        const statusEl = card.querySelector('.fc-status');
+        statusEl.className = 'fc-status'; // remove reviewing
+        statusEl.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg> ${vLabel}`;
+        
+        // Add click handler for details
+        card.addEventListener('click', () => showFindingDetail(id));
+    }
 }
 
-// Filters
-document.querySelectorAll('.severity-filters .chip').forEach(chip => {
-    chip.addEventListener('click', (e) => {
-        const filter = e.target.dataset.filter;
-        if (activeFilters.has(filter)) {
-            activeFilters.delete(filter);
-            e.target.classList.remove('active');
-        } else {
-            activeFilters.add(filter);
-            e.target.classList.add('active');
-        }
-        renderDocumentAndFindings();
-    });
-});
+function showFindingDetail(id) {
+    if (!currentReport) return;
+    const f = currentReport.findings.find(x => x.id === id);
+    if (!f) return;
+    
+    // Highlight in doc
+    document.querySelectorAll('.highlight').forEach(el => el.classList.remove('active'));
+    const docSpan = document.getElementById(`hl-${id}`);
+    if (docSpan) {
+        docSpan.classList.add('active');
+        docSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    // Slide panel
+    const detail = $('slide-content');
+    detail.innerHTML = `
+        <h2 style="font-family:var(--font-display); font-size:24px; font-weight:400; margin:0 0 16px">${f.title}</h2>
+        <div class="detail-section">
+            <h4>Severity & Verdict</h4>
+            <div style="display:flex; gap:8px">
+                <span class="chip ${f.severity}"><span class="pip ${f.severity}"></span> ${f.severity}</span>
+                <span class="chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> ${f.verdict}</span>
+            </div>
+        </div>
+        
+        <div class="detail-section" style="margin-top:24px">
+            <h4>Quote</h4>
+            <div class="detail-quote">${f.evidence_quotes[0] || 'No quote provided.'}</div>
+        </div>
+        
+        <div class="detail-section" style="margin-top:24px">
+            <h4>Why this matters</h4>
+            <p>${f.plain_explanation || f.why_risky_for_user}</p>
+        </div>
+        
+        ${f.suggested_counter_clause ? `
+        <div class="counter-clause-box" style="margin-top:32px">
+            <h4>Ask for this instead</h4>
+            <p>${f.suggested_counter_clause}</p>
+            <button class="icon-btn copy-btn" onclick="navigator.clipboard.writeText('${f.suggested_counter_clause.replace(/'/g, "\\'")}'); showToast('Copied!')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+        </div>
+        ` : ''}
+    `;
+    
+    $('detail-overlay').classList.add('open');
+}
 
-// Restart
-document.getElementById('btn-analyze-another').addEventListener('click', () => {
-    showView('landing');
-    currentJobId = null;
-    currentReport = null;
-    document.getElementById('upload-form').reset();
-    document.getElementById('drop-zone').querySelector('p').textContent = 'Drag and drop a PDF or TXT file here, or click to browse.';
+$('close-detail').addEventListener('click', () => $('detail-overlay').classList.remove('open'));
+
+// Simple renderer parsing pseudo-paragraphs and adding IDs
+function renderDocument(text, findings = []) {
+    const lines = text.split('\n').filter(l => l.trim().length > 0);
+    let html = '';
+    
+    lines.forEach((line, i) => {
+        let content = line;
+        // If findings exist, highlight text
+        if (findings.length > 0) {
+            findings.forEach(f => {
+                f.evidence_quotes.forEach(q => {
+                    if (q.length > 10 && content.includes(q)) {
+                        content = content.replace(q, `<span class="highlight ${f.severity}" id="hl-${f.id}">${q}</span>`);
+                    }
+                });
+            });
+        }
+        
+        const isHeading = /^\d+(\.\d+)*\s+[A-Z]/.test(line);
+        if (isHeading) {
+            html += `<div class="doc-clause"><h3>${content}</h3></div>`;
+        } else {
+            html += `<div class="doc-clause"><span class="clause-number">§${i+1}</span>${content}</div>`;
+        }
+    });
+    
+    $('doc-content').innerHTML = html;
+}
+
+// Utils
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast'; t.textContent = msg;
+    $('toast-container').appendChild(t);
+    setTimeout(() => t.remove(), 3300);
+}
+
+// Keyboard
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') $('detail-overlay').classList.remove('open');
 });
