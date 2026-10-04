@@ -39,7 +39,3 @@ The risk score is a deterministic calculation:
 1. Each surviving finding gets a weight based on severity (High=3, Medium=2, Low=1).
 2. Weight is multiplied by the Skeptic's final confidence (0-1).
 3. The sum is passed through a saturating exponential curve: `round(100 * (1 - exp(-total / 8)))`
-
-## Limitations
-- No OCR: FinePrint currently only supports text-based PDFs and plain text.
-- AI can make mistakes: This is a decision-support tool, not legal advice. Always verify important points with a qualified lawyer.
