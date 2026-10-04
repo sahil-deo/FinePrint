@@ -76,6 +76,21 @@ $('file-input').addEventListener('change', e => {
     if (e.target.files[0]) showToast(`Loaded ${e.target.files[0].name}`);
 });
 
+document.querySelectorAll('.sample-chip').forEach(chip => {
+    chip.addEventListener('click', async () => {
+        const sampleName = chip.getAttribute('data-sample');
+        try {
+            const res = await fetch(`/sample/${sampleName}`);
+            if (!res.ok) throw new Error("Failed to load sample");
+            const data = await res.json();
+            $('text-input').value = data.text;
+            showToast(`Loaded ${sampleName}`);
+        } catch (err) {
+            showToast(err.message);
+        }
+    });
+});
+
 // Graph rendering
 const graphNodes = [
     { id: 'Segmenter', x: 80, y: 100, type: 'code', label: 'Segmenter' },
@@ -211,6 +226,16 @@ function transitionToReview() {
     $('score-number').textContent = score.risk_score;
     $('verdict-sentence').textContent = score.verdict_label + ". " + currentReport.findings.length + " issues found.";
     
+    let high = 0, med = 0, low = 0;
+    currentReport.findings.forEach(f => {
+        if (f.severity === 'high') high++;
+        else if (f.severity === 'medium') med++;
+        else low++;
+    });
+    const elHigh = $('c-high'); if (elHigh) elHigh.textContent = high;
+    const elMed = $('c-medium'); if (elMed) elMed.textContent = med;
+    const elLow = $('c-low'); if (elLow) elLow.textContent = low;
+    
     // Render document highlights
     if (currentReport.document_text) {
         renderDocument(currentReport.document_text, currentReport.findings);
@@ -264,6 +289,9 @@ function updateFindingCard(id, verdict, reason) {
         const statusEl = card.querySelector('.fc-status');
         statusEl.className = 'fc-status'; // remove reviewing
         statusEl.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg> ${vLabel}`;
+        
+        const chipEl = card.querySelector('.fc-clause-chip');
+        if (chipEl) chipEl.remove();
         
         // Add click handler for details
         card.addEventListener('click', () => showFindingDetail(id));
@@ -361,4 +389,54 @@ function showToast(msg) {
 // Keyboard
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') $('detail-overlay').classList.remove('open');
+});
+
+// Export report
+$('btn-export').addEventListener('click', () => {
+    if (!currentReport) return showToast("No report to export");
+    
+    let reportHtml = `
+        <html>
+        <head>
+            <title>FinePrint Report - ${currentReport.document_name}</title>
+            <style>
+                body { font-family: sans-serif; line-height: 1.6; padding: 40px; color: #333; max-width: 800px; margin: 0 auto; }
+                h1 { border-bottom: 2px solid #333; padding-bottom: 10px; }
+                .finding { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; page-break-inside: avoid; }
+                .finding h3 { margin-top: 0; }
+                .severity-high { color: #d32f2f; }
+                .severity-medium { color: #f57c00; }
+                .severity-low { color: #388e3c; }
+                .quote { background: #f9f9f9; padding: 10px; font-style: italic; border-left: 4px solid #ccc; margin-bottom: 15px; }
+            </style>
+        </head>
+        <body>
+            <h1>FinePrint Analysis Report</h1>
+            <p><strong>Document:</strong> ${currentReport.document_name}</p>
+            <p><strong>Risk Score:</strong> ${currentReport.score.risk_score} / 100 (${currentReport.score.verdict_label})</p>
+            <p><strong>Summary:</strong> ${currentReport.executive_summary || 'No summary available.'}</p>
+            <h2>Findings (${currentReport.findings.length})</h2>
+    `;
+    
+    currentReport.findings.forEach(f => {
+        reportHtml += `
+            <div class="finding">
+                <h3 class="severity-${f.severity}">${f.title} (${f.severity.toUpperCase()})</h3>
+                <div class="quote">"${f.evidence_quotes[0] || 'No quote'}"</div>
+                <p><strong>Why this matters:</strong> ${f.plain_explanation || f.why_risky_for_user}</p>
+                ${f.suggested_counter_clause ? `<p><strong>Suggested change:</strong> ${f.suggested_counter_clause}</p>` : ''}
+            </div>
+        `;
+    });
+    
+    reportHtml += `</body></html>`;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return showToast("Pop-up blocked. Please allow pop-ups to export.");
+    printWindow.document.write(reportHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+    }, 250);
 });

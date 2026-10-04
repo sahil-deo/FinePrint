@@ -21,12 +21,12 @@ FinePrint is heavily constrained against hallucination.
 
 1. `pip install -r requirements.txt`
 2. `cp .env.example .env`
-3. Add your `GROQ_API_KEY` and `GROQ_MODEL` to `.env`.
+3. Add your `GEMINI_API_KEY` and `GEMINI_MODEL` to `.env`.
 4. Run the server: `uvicorn app.api:app --reload`
 5. Open `http://localhost:8000`
 
 ### Demo Mode
-If you don't have a Groq API key, you can run FinePrint in demo mode, which replays recorded events.
+If you don't have a Gemini API key, you can run FinePrint in demo mode, which replays recorded events.
 Set `FINEPRINT_DEMO=1` in your `.env` or just run the server without an API key.
 
 To record a new demo cache:
