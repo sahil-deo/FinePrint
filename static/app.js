@@ -248,11 +248,11 @@ function renderDocumentAndFindings() {
                 <p class="text-muted" style="font-size:0.8rem">Found by: ${f.found_by.join(', ')}</p>
             </details>
             ${f.suggested_counter_clause ? `
-                <div style="margin-top:1rem; padding:0.5rem; background:rgba(0,0,0,0.05); border-radius:4px;">
-                    <strong>Ask for this instead:</strong><br>
-                    ${f.what_to_ask_for}<br><br>
-                    <button class="btn secondary" style="font-size:0.7rem; padding:0.25rem 0.5rem" onclick="navigator.clipboard.writeText('${f.suggested_counter_clause.replace(/'/g, "\\'")}'); showToast('Copied counter-clause!')">Copy Clause</button>
-                    <p style="font-size:0.8rem; margin-top:0.5rem; font-family:monospace">${f.suggested_counter_clause}</p>
+                <div style="margin-top:1.5rem; padding:1.25rem; background:var(--bg-color); border: 1px solid var(--border-color); border-radius:8px;">
+                    <strong style="color:var(--primary-color)">Ask for this instead:</strong>
+                    <p style="margin-top:0.5rem; margin-bottom:1rem">${f.what_to_ask_for}</p>
+                    <button class="btn secondary" style="font-size:0.75rem; padding:0.35rem 0.75rem" onclick="navigator.clipboard.writeText('${f.suggested_counter_clause.replace(/'/g, "\\'")}'); showToast('Copied counter-clause!')">Copy Exact Clause</button>
+                    <p style="font-size:0.85rem; margin-top:0.75rem; font-family:monospace; padding:0.75rem; background:rgba(128,128,128,0.05); border-radius:4px; border:1px dashed var(--border-color)">${f.suggested_counter_clause}</p>
                 </div>
             ` : ''}
         `;
