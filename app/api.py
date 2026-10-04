@@ -126,9 +126,10 @@ async def stream(job_id: str, request: Request):
                     idx += 1
                 else:
                     waiter.clear()
-                    await asyncio.wait_for(waiter.wait(), timeout=1.0)
-        except asyncio.TimeoutError:
-            pass # Keep alive
+                    try:
+                        await asyncio.wait_for(waiter.wait(), timeout=1.0)
+                    except asyncio.TimeoutError:
+                        yield ": keepalive\n\n"
         finally:
             if waiter in store.waiters.get(job_id, []):
                 store.waiters[job_id].remove(waiter)

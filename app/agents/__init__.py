@@ -5,6 +5,7 @@ that renders its input. The orchestrator wires them together.
 """
 
 from . import (  # noqa: F401
+    simplified,
     advisor,
     cross_clause,
     hunters,

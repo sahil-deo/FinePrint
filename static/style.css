@@ -1,38 +1,42 @@
 :root {
-    --bg-color: #ffffff;
-    --text-color: #1a1a1a;
-    --text-muted: #666666;
-    --border-color: #e5e5e5;
-    --primary-color: #0b2545;
-    --accent-color: #f77f00;
+    --bg-color: #fafafa;
+    --text-color: #2b2b2b;
+    --text-muted: #6b7280;
+    --border-color: #e5e7eb;
+    --primary-color: #0f172a;
+    --accent-color: #2563eb;
     
-    --severity-high: #d62828;
-    --severity-medium: #f77f00;
-    --severity-low: #8cb369;
-    --severity-high-bg: #ffebee;
-    --severity-medium-bg: #fff3e0;
-    --severity-low-bg: #e8f5e9;
+    --severity-high: #ef4444;
+    --severity-medium: #f59e0b;
+    --severity-low: #10b981;
+    --severity-high-bg: rgba(239, 68, 68, 0.05);
+    --severity-medium-bg: rgba(245, 158, 11, 0.05);
+    --severity-low-bg: rgba(16, 185, 129, 0.05);
     
     --card-bg: #ffffff;
-    --card-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    --border-radius: 12px;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --border-radius: 16px;
     
-    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-serif: Georgia, 'Times New Roman', Times, serif;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-serif: 'Playfair Display', Charter, Cambria, serif;
 }
 
 [data-theme="dark"] {
-    --bg-color: #121212;
-    --text-color: #e0e0e0;
-    --text-muted: #9e9e9e;
-    --border-color: #333333;
-    --primary-color: #90caf9;
-    --card-bg: #1e1e1e;
-    --card-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    --bg-color: #0f172a;
+    --text-color: #f8fafc;
+    --text-muted: #94a3b8;
+    --border-color: #1e293b;
+    --primary-color: #f8fafc;
+    --accent-color: #3b82f6;
+    --card-bg: #1e293b;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
     
-    --severity-high-bg: #3b1c1c;
-    --severity-medium-bg: #3b2a1c;
-    --severity-low-bg: #1e3321;
+    --severity-high: #f87171;
+    --severity-medium: #fbbf24;
+    --severity-low: #34d399;
+    --severity-high-bg: rgba(248, 113, 113, 0.1);
+    --severity-medium-bg: rgba(251, 191, 36, 0.1);
+    --severity-low-bg: rgba(52, 211, 153, 0.1);
 }
 
 body {
@@ -42,6 +46,7 @@ body {
     margin: 0;
     line-height: 1.6;
     transition: background-color 0.3s, color 0.3s;
+    font-size: 15px;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -276,35 +281,47 @@ textarea {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 120px;
-    height: 120px;
+    width: 100px;
+    height: 100px;
+    flex-shrink: 0;
     border-radius: 50%;
-    border: 8px solid var(--border-color);
+    border: 6px solid var(--border-color);
+    box-sizing: border-box;
 }
 #risk-score {
-    font-size: 2rem;
-    font-weight: bold;
+    font-size: 2.2rem;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: -4px;
+}
+#risk-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
 }
 
 .severity-filters {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 }
 .chip {
-    padding: 0.25rem 0.75rem;
-    border-radius: 16px;
+    padding: 0.35rem 1rem;
+    border-radius: 20px;
     border: 1px solid;
     cursor: pointer;
-    font-size: 0.8rem;
-    font-weight: bold;
+    font-size: 0.85rem;
+    font-weight: 600;
     background: transparent;
+    white-space: nowrap;
+    transition: all 0.2s;
 }
 .chip.high { color: var(--severity-high); border-color: var(--severity-high); }
-.chip.high.active { background: var(--severity-high); color: white; }
+.chip.high.active { background: var(--severity-high); color: white; border-color: transparent; }
 .chip.medium { color: var(--severity-medium); border-color: var(--severity-medium); }
-.chip.medium.active { background: var(--severity-medium); color: white; }
+.chip.medium.active { background: var(--severity-medium); color: var(--primary-color); border-color: transparent; }
 .chip.low { color: var(--severity-low); border-color: var(--severity-low); }
-.chip.low.active { background: var(--severity-low); color: white; }
+.chip.low.active { background: var(--severity-low); color: white; border-color: transparent; }
 
 .two-pane {
     display: flex;
@@ -315,32 +332,62 @@ textarea {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    padding: 2rem;
-    height: 600px;
+    padding: 2.5rem;
+    height: 650px;
     overflow-y: auto;
     white-space: pre-wrap;
     font-family: var(--font-serif);
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: var(--text-color);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
 }
 .right-pane {
     flex: 1;
-    height: 600px;
+    height: 650px;
     overflow-y: auto;
+    padding-right: 0.5rem;
 }
 
 .finding-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    padding: 1.5rem;
-    margin-bottom: 1rem;
+    padding: 1.75rem;
+    margin-bottom: 1.25rem;
     box-shadow: var(--card-shadow);
+    position: relative;
+    overflow: hidden;
 }
-.finding-card.high { border-left: 6px solid var(--severity-high); background: var(--severity-high-bg); }
-.finding-card.medium { border-left: 6px solid var(--severity-medium); background: var(--severity-medium-bg); }
-.finding-card.low { border-left: 6px solid var(--severity-low); background: var(--severity-low-bg); }
+.finding-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+}
+.finding-card.high { background: var(--severity-high-bg); border-color: rgba(239, 68, 68, 0.2); }
+.finding-card.high::before { background: var(--severity-high); }
+.finding-card.medium { background: var(--severity-medium-bg); border-color: rgba(245, 158, 11, 0.2); }
+.finding-card.medium::before { background: var(--severity-medium); }
+.finding-card.low { background: var(--severity-low-bg); border-color: rgba(16, 185, 129, 0.2); }
+.finding-card.low::before { background: var(--severity-low); }
 
 .finding-card h4 {
-    margin-bottom: 0.5rem;
+    margin-top: 0.75rem;
+    margin-bottom: 1rem;
+    font-family: var(--font-sans);
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+.finding-card h4 a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+.finding-card h4 a:hover {
+    text-decoration: underline;
+    text-decoration-color: var(--accent-color);
 }
 .badge {
     display: inline-block;
