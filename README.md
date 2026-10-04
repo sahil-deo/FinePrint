@@ -1,3 +1,5 @@
+Live At: https://fineprint-sngs.onrender.com/
+
 # FinePrint
 
 A multi-agent hidden-clause finder for any agreement. FinePrint helps ordinary people understand what they are signing before they sign it, flagging risky clauses, challenging its own findings, and explaining what to ask for instead.
