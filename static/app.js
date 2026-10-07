@@ -36,7 +36,7 @@ $('upload-form').addEventListener('submit', async (e) => {
     if (file) formData.append('file', file);
     
     const btn = $('btn-analyze');
-    btn.textContent = "Connecting...";
+    btn.textContent = "Analyzing...";
     btn.disabled = true;
     
     try {
@@ -69,11 +69,14 @@ document.addEventListener('drop', e => {
     if (file) {
         $('file-input').files = e.dataTransfer.files;
         showToast(`Loaded ${file.name}`);
-        // auto trigger if ready
+        $('btn-analyze').click();
     }
 });
 $('file-input').addEventListener('change', e => {
-    if (e.target.files[0]) showToast(`Loaded ${e.target.files[0].name}`);
+    if (e.target.files[0]) {
+        showToast(`Loaded ${e.target.files[0].name}`);
+        $('btn-analyze').click();
+    }
 });
 
 document.querySelectorAll('.sample-chip').forEach(chip => {
